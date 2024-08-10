@@ -1,5 +1,8 @@
 import React from 'react';
+import axios from 'axios';
 
+
+const API_ENDPOINT = 'https://hn.algolia.com/api/v1/search?query=';
 
 const App = () => {
     const initialStories = [{
@@ -50,34 +53,43 @@ const App = () => {
         {data: [], isLoading: false, isError: false}
     );
 
-    const getAsyncStories = () =>
-        new Promise((resolve, reject) => setTimeout(
-            () => resolve({data: {stories: initialStories}}),
-            2000
-        ));
+
     const [searchTerm, setSearchTerm] = React.useState(localStorage.getItem('search') || 'React');
     // const [stories, setStories] = React.useState([]);
     React.useEffect(() => {
         localStorage.setItem('search', searchTerm);
     }, [searchTerm]);
-    const handleSearch = event => {
-        setSearchTerm(event.target.value);
-    };
-    const searchedStories = stories.data.filter(story => story.title.includes(searchTerm))
 
+    const [url, setUrl] = React.useState(
+        `${API_ENDPOINT}${searchTerm}`
+    );
+
+    const handleFetchStories = React.useCallback(() => {
+        dispatchStories({type: 'STORIES_FETCH_INIT'});
+        axios.get(url)
+            .then(result => {
+                dispatchStories({
+                    type: 'STORIES_FETCH_SUCCESS',
+                    payload: result.data.hits,
+                });
+            })
+            .catch(() =>
+                dispatchStories({type: 'STORIES_FETCH_FAILURE'})
+            );
+    }, [url]);
 
     React.useEffect(() => {
-        dispatchStories({type: 'STORIES_FETCH_INIT'});
-        getAsyncStories().then(result => {
-            dispatchStories({
-                type: 'STORIES_FETCH_SUCCESS',
-                payload: result.data.stories,
-            });
-        }).catch(() =>
-            dispatchStories({type: 'STORIES_FETCH_FAILURE'})
-        );
-        ;
-    }, []);
+        handleFetchStories(); // C
+    }, [handleFetchStories]);
+
+
+    const handleSearchInput = event => {
+        setSearchTerm(event.target.value);
+    };
+    const handleSearchSubmit = (event) => {
+        setUrl(`${API_ENDPOINT}${searchTerm}`);
+        event.preventDefault();
+    };
 
 
     const handleRemoveStory = item => {
@@ -89,34 +101,55 @@ const App = () => {
 
 
     return (<div>
-        <h1>{searchTerm}</h1>
+            <h1>{searchTerm}</h1>
+            <SearchForm
+                searchTerm={searchTerm}
+                onSearchInput={handleSearchInput}
+                onSearchSubmit={handleSearchSubmit}
+            />
+
+            {stories.isError ? (
+                <p>Something went wrong ...</p>
+            ) : <p>
+            </p>}
+            {stories.isLoading ? (
+                <p>Loading ...</p>
+            ) : (
+                <List
+                    list={stories.data}
+                    onRemoveItem={handleRemoveStory}
+                />
+            )
+            }
+
+
+        </div>
+    );
+};
+
+const SearchForm = ({
+                        searchTerm,
+                        onSearchInput,
+                        onSearchSubmit,
+                    }) => (
+    <form onSubmit={onSearchSubmit}>
         <InputWithLabel
             id="search"
             value={searchTerm}
             isFocused
-            onInputChange={handleSearch}
+            onInputChange={onSearchInput}
         >
-            Search
+            <strong>Search:</strong>
         </InputWithLabel>
-        {stories.isError ? (
-            <p>Something went wrong ...</p>
-        ) : <p>
-        </p>}
-        {stories.isLoading ? (
-            <p>Loading ...</p>
-        ) : (
-            <List
-                list={searchedStories}
-                onRemoveItem={handleRemoveStory}
-            />
-        )
-        }
+        <button type="submit" disabled={!searchTerm}>
+            Submit
+        </button>
+    </form>
+);
 
-
-    </div>);
-};
-
-const List = ({list, onRemoveItem}) =>
+const List = ({
+                  list, onRemoveItem
+              }) =>
     list.map(item => (
         <Item
             key={item.objectID}
