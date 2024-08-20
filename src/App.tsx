@@ -1,7 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
-import { ReactComponent as Check } from './check.svg';
+import {ReactComponent as Check} from './check.svg';
 
 const StyledContainer = styled.div`
     height: 100vw;
@@ -44,6 +44,7 @@ const StyledButton = styled.button`
         background: #171212;
         color: #ffffff;
     }
+
     &:hover {
         background: #171212;
         color: #ffffff;
@@ -70,20 +71,60 @@ const StyledInput = styled.input`
     font-size: 24px;
 `;
 
+type Story = {
+    objectID: string;
+    url: string;
+    title: string;
+    author: string;
+    num_comments: number;
+    points: number;
+};
+type Stories = Array<Story>;
+type ListProps = {
+    list: Stories;
+    onRemoveItem: (item: Story) => void;
+};
+type StoriesState = {
+    data: Stories;
+    isLoading: boolean;
+    isError: boolean;
+};
+type StoriesAction =
+    | StoriesFetchInitAction
+    | StoriesFetchSuccessAction
+    | StoriesFetchFailureAction
+    | StoriesRemoveAction;
+
+interface StoriesFetchInitAction {
+    type: 'STORIES_FETCH_INIT';
+}
+
+interface StoriesFetchSuccessAction {
+    type: 'STORIES_FETCH_SUCCESS';
+    payload: Stories;
+}
+
+interface StoriesFetchFailureAction {
+    type: 'STORIES_FETCH_FAILURE';
+}
+
+interface StoriesRemoveAction {
+    type: 'REMOVE_STORY';
+    payload: Story;
+}
+
 const API_ENDPOINT = 'https://hn.algolia.com/api/v1/search?query=';
+const getSumComments = stories => {
+    console.log('C');
+    return stories.data.reduce(
+        (result, value) => result + value.num_comments,
+        0
+    );
+};
 
 const App = () => {
-    const initialStories = [{
-        title: 'React', url: 'https://reactjs.org/', author: 'Jordan Walke', num_comments: 3, points: 4, objectID: 0,
-    }, {
-        title: 'Redux',
-        url: 'https://redux.js.org/',
-        author: 'Dan Abramov, Andrew Clark',
-        num_comments: 2,
-        points: 5,
-        objectID: 1,
-    },];
-    const storiesReducer = (state, action) => {
+
+    const storiesReducer = (state: StoriesState, action: StoriesAction) => {
         switch (action.type) {
             case 'STORIES_FETCH_INIT':
                 return {
@@ -122,10 +163,17 @@ const App = () => {
     );
 
 
+    const isMounted = React.useRef(false);
     const [searchTerm, setSearchTerm] = React.useState(localStorage.getItem('search') || 'React');
     // const [stories, setStories] = React.useState([]);
     React.useEffect(() => {
-        localStorage.setItem('search', searchTerm);
+        if (!isMounted.current) {
+            isMounted.current = true;
+        } else {
+            console.log('77777777777');
+            localStorage.setItem('search', searchTerm);
+        }
+
     }, [searchTerm]);
 
     const [url, setUrl] = React.useState(
@@ -149,12 +197,14 @@ const App = () => {
     React.useEffect(() => {
         handleFetchStories(); // C
     }, [handleFetchStories]);
+    const sumComments = React.useMemo(() => getSumComments(stories), [
+        stories,
+    ]);
 
-
-    const handleSearchInput = event => {
+    const handleSearchInput = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(event.target.value);
     };
-    const handleSearchSubmit = (event) => {
+    const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         setUrl(`${API_ENDPOINT}${searchTerm}`);
         event.preventDefault();
     };
@@ -167,9 +217,9 @@ const App = () => {
         });
     };
 
-
+    console.log('B:App');
     return (<StyledContainer>
-            <StyledHeadlinePrimary>My Hacker Stories</StyledHeadlinePrimary>
+            <StyledHeadlinePrimary>My Hacker Stories with {sumComments} comments.</StyledHeadlinePrimary>
             <SearchForm
                 searchTerm={searchTerm}
                 onSearchInput={handleSearchInput}
@@ -195,11 +245,18 @@ const App = () => {
     );
 };
 
+type SearchFormProps = {
+    searchTerm: string;
+    onSearchInput: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+};
+
+
 const SearchForm = ({
                         searchTerm,
                         onSearchInput,
                         onSearchSubmit,
-                    }) => (
+                    }: SearchFormProps) => (
     <StyledSearchForm onSubmit={onSearchSubmit}>
         <InputWithLabel
             id="search"
@@ -215,23 +272,32 @@ const SearchForm = ({
     </StyledSearchForm>
 );
 
-const List = ({
-                  list, onRemoveItem
-              }) =>
-    list.map(item => (
-        <Item
-            key={item.objectID}
-            item={item}
-            onRemoveItem={onRemoveItem}
-        />
-    ));
+const List = ({list, onRemoveItem}: ListProps) =>
+    <>
+        {list.map(item => (
+            <Item
+                key={item.objectID}
+                item={item}
+                onRemoveItem={onRemoveItem}
+            />
+        ))}
+    </>
+
+type InputWithLabelProps = {
+    id: string;
+    value: string;
+    type?: string;
+    onInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    isFocused?: boolean;
+    children: React.ReactNode;
+};
 
 
 const InputWithLabel = ({
-                            id, label, value, type = 'text', onInputChange, children, isFocused
-                        }) => {
+                            id, value, type = 'text', onInputChange, children, isFocused
+                        }: InputWithLabelProps) => {
     // A
-    const inputRef = React.useRef();
+    const inputRef = React.useRef<HTMLInputElement>(null!);
     // C
     React.useEffect(() => {
         if (isFocused && inputRef.current) {
@@ -253,7 +319,13 @@ const InputWithLabel = ({
     </>)
 };
 
-const Item = ({item, onRemoveItem}) => (
+type ItemProps = {
+    item: Story;
+    onRemoveItem: (item: Story) => void;
+};
+
+
+const Item = ({item, onRemoveItem}: ItemProps) => (
     <StyledItem>
         <StyledColumn width="40%">
             <a href={item.url}>{item.title}</a>
@@ -265,7 +337,7 @@ const Item = ({item, onRemoveItem}) => (
             <StyledButtonSmall
                 type="button" onClick={() => onRemoveItem(item)}
             >
-                <Check height="18px" width="18px" />
+                <Check height="18px" width="18px"/>
             </StyledButtonSmall>
         </StyledColumn>
     </StyledItem>
